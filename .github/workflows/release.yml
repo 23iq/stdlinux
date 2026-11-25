@@ -1,0 +1,31 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: cargo test --locked
+      - run: cargo build --locked --release --target x86_64-unknown-linux-musl
+      - name: Package
+        run: |
+          cp target/x86_64-unknown-linux-musl/release/stdlinux stdlinux-x86_64-linux
+          sha256sum stdlinux-x86_64-linux > stdlinux-x86_64-linux.sha256
+          # A static binary has no interpreter and no shared libraries.
+          ! readelf -l stdlinux-x86_64-linux | grep -q 'Requesting program interpreter'
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            stdlinux-x86_64-linux
+            stdlinux-x86_64-linux.sha256
+          generate_release_notes: true
